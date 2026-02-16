@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Zap, Mail, Lock, AlertCircle } from 'lucide-react';
 import { useAuthStore } from '@/lib/auth-store';
 import { apiClient } from '@/lib/api-client';
+import { PublicRoute } from '@/components/auth/PublicRoute';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -44,7 +45,8 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-teal-50 to-slate-100 flex items-center justify-center p-4">
+    <PublicRoute redirectIfAuthenticated>
+      <div className="min-h-screen bg-gradient-to-br from-teal-50 to-slate-100 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="flex items-center justify-center gap-2 mb-8">
@@ -157,5 +159,6 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
+    </PublicRoute>
   );
 }

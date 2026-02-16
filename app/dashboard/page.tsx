@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Plus, MessageCircle, TrendingUp, Users } from 'lucide-react';
 import DashboardLayout from '@/components/DashboardLayout';
+import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { useAuthStore } from '@/lib/auth-store';
 import { apiClient } from '@/lib/api-client';
 
@@ -29,12 +30,6 @@ export default function DashboardPage() {
   });
 
   useEffect(() => {
-    // Check if user is logged in
-    if (!user) {
-      router.push('/auth/login');
-      return;
-    }
-
     // Fetch bots
     const fetchBots = async () => {
       try {
@@ -56,7 +51,8 @@ export default function DashboardPage() {
   }, [user, router]);
 
   return (
-    <DashboardLayout>
+    <ProtectedRoute>
+      <DashboardLayout>
       <div className="space-y-8">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -195,5 +191,6 @@ export default function DashboardPage() {
         </div>
       </div>
     </DashboardLayout>
+    </ProtectedRoute>
   );
 }
