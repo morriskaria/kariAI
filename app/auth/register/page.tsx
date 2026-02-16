@@ -70,8 +70,8 @@ export default function RegisterPage() {
       setUser(user);
       setError(null);
 
-      // Redirect to dashboard
-      router.push('/dashboard');
+      // Redirect to verification sent page
+      router.push('/auth/verification-sent');
     } catch (err: any) {
       const message = err.response?.data?.message || 'Registration failed. Please try again.';
       setLocalError(message);

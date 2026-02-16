@@ -1,10 +1,14 @@
-import { Controller, Post, Body, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Body, HttpCode, HttpStatus, Query } from '@nestjs/common';
 import { AuthService } from './auth.service';
+import { VerificationService } from './verification.service';
 import { RegisterDto, LoginDto, AuthResponseDto } from './dto/auth.dto';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private authService: AuthService) {}
+  constructor(
+    private authService: AuthService,
+    private verificationService: VerificationService,
+  ) { }
 
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
@@ -22,5 +26,17 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async validate(@Body('token') token: string) {
     return this.authService.validateToken(token);
+  }
+
+  @Post('verify-email')
+  @HttpCode(HttpStatus.OK)
+  async verifyEmail(@Query('token') token: string) {
+    return this.verificationService.verifyEmail(token);
+  }
+
+  @Post('resend-verification')
+  @HttpCode(HttpStatus.OK)
+  async resendVerification(@Body('email') email: string) {
+    return this.verificationService.resendVerification(email);
   }
 }

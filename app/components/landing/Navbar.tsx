@@ -1,4 +1,5 @@
 import Link from "next/link"
+import Image from "next/image"
 import { Button } from "../ui/button"
 
 export function Navbar() {
@@ -6,7 +7,7 @@ export function Navbar() {
         <header className="sticky top-0 z-50 w-full border-b border-white/5 bg-black/50 backdrop-blur-xl">
             <div className="container px-4 md:px-6 mx-auto h-16 flex items-center justify-between">
                 <Link href="/" className="flex items-center gap-2">
-                    <img src="/main logo.png" alt="KariAI Logo" className="h-24 w-auto object-contain" />
+                    <Image src="/main logo.png" alt="KariAI Logo" width={96} height={32} className="h-8 w-auto object-contain" />
                     {/* <span className="text-lg font-bold tracking-tight text-white">
                         Index
                     </span> */}
