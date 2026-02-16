@@ -59,6 +59,14 @@ class ApiClient {
     return this.client.post('/auth/logout');
   }
 
+  async verifyEmail(token: string) {
+    return this.client.post(`/auth/verify-email?token=${token}`);
+  }
+
+  async resendVerification(email: string) {
+    return this.client.post('/auth/resend-verification', { email });
+  }
+
   // Bot endpoints
   async getBots() {
     return this.client.get('/bots');
