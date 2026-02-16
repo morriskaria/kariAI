@@ -1,15 +1,18 @@
 import { Injectable, BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
+import { EmailService } from '../email/email.service';
 import { RegisterDto, LoginDto, AuthResponseDto } from './dto/auth.dto';
 import * as bcrypt from 'bcryptjs';
+import * as crypto from 'crypto';
 
 @Injectable()
 export class AuthService {
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
-  ) {}
+    private emailService: EmailService,
+  ) { }
 
   async register(registerDto: RegisterDto): Promise<AuthResponseDto> {
     const { email, password, firstName, lastName } = registerDto;
@@ -26,6 +29,11 @@ export class AuthService {
     // Hash password
     const passwordHash = await bcrypt.hash(password, 10);
 
+    // Generate verification token
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    const verificationTokenExpires = new Date();
+    verificationTokenExpires.setHours(verificationTokenExpires.getHours() + 24); // 24 hour expiry
+
     // Create user and organization
     const user = await this.prisma.user.create({
       data: {
@@ -34,6 +42,9 @@ export class AuthService {
         firstName,
         lastName,
         role: 'USER',
+        emailVerified: false,
+        verificationToken,
+        verificationTokenExpires,
       },
     });
 
@@ -56,6 +67,13 @@ export class AuthService {
         messagesLimit: 1000,
       },
     });
+
+    // Send verification email
+    await this.emailService.sendVerificationEmail(
+      user.email,
+      user.firstName || 'there',
+      verificationToken,
+    );
 
     const token = this.jwtService.sign({
       sub: user.id,
