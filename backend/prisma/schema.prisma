@@ -1,0 +1,163 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// User model
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  passwordHash  String
+  firstName     String?
+  lastName      String?
+  role          UserRole  @default(USER)
+  organization  Organization?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+
+  @@index([email])
+  @@index([role])
+}
+
+// Organization (multi-tenant)
+model Organization {
+  id            String    @id @default(cuid())
+  name          String
+  ownerId       String    @unique
+  owner         User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  bots          Bot[]
+  subscription  Subscription?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+
+  @@index([ownerId])
+}
+
+// Chatbot
+model Bot {
+  id              String    @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name            String
+  description     String?
+  systemPrompt    String    @db.Text
+  model           String    @default("gpt-4-turbo")
+  temperature     Float     @default(0.7)
+  status          BotStatus @default(DRAFT)
+  tone            String?   @default("professional")
+  conversations   Conversation[]
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
+
+  @@index([organizationId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// Conversation
+model Conversation {
+  id              String    @id @default(cuid())
+  botId           String
+  bot             Bot       @relation(fields: [botId], references: [id], onDelete: Cascade)
+  userIdentifier  String    // Email or anonymous ID
+  messages        Message[]
+  satisfaction    Int?      // 1-5 rating
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([botId])
+  @@index([userIdentifier])
+  @@index([createdAt])
+}
+
+// Message
+model Message {
+  id              String    @id @default(cuid())
+  conversationId  String
+  conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role            MessageRole
+  content         String    @db.Text
+  tokens          Int?      // Token count for billing
+  timestamp       DateTime  @default(now())
+
+  @@index([conversationId])
+  @@index([timestamp])
+}
+
+// Subscription
+model Subscription {
+  id              String    @id @default(cuid())
+  organizationId  String    @unique
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  stripeCustomerId String?
+  stripeSubscriptionId String?
+  plan            SubscriptionPlan @default(FREE)
+  status          SubscriptionStatus @default(ACTIVE)
+  messagesUsed    Int       @default(0)
+  messagesLimit   Int       @default(1000)
+  currentPeriodStart DateTime?
+  currentPeriodEnd DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([organizationId])
+  @@index([status])
+}
+
+// Analytics (for aggregated metrics)
+model BotAnalytics {
+  id              String    @id @default(cuid())
+  botId           String
+  date            DateTime  @default(now())
+  conversationCount Int     @default(0)
+  messageCount    Int       @default(0)
+  avgSatisfaction Float?
+  uniqueUsers     Int       @default(0)
+  createdAt       DateTime  @default(now())
+
+  @@index([botId])
+  @@index([date])
+  @@unique([botId, date])
+}
+
+// Enums
+enum UserRole {
+  ADMIN
+  USER
+}
+
+enum BotStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  ARCHIVED
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+enum SubscriptionPlan {
+  FREE
+  STARTER
+  GROWTH
+  ENTERPRISE
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAUSED
+  CANCELLED
+  EXPIRED
+}
