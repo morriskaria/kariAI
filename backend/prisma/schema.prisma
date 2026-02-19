@@ -11,19 +11,24 @@ datasource db {
 
 // User model
 model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
-  passwordHash  String
-  firstName     String?
-  lastName      String?
-  role          UserRole  @default(USER)
-  emailVerified Boolean   @default(false)
-  verificationToken String?
+  id                       String          @id @default(cuid())
+  email                    String          @unique
+  passwordHash             String
+  firstName                String?
+  lastName                 String?
+  phone                    String?
+  company                  String?
+  avatarUrl                String?
+  role                     UserRole        @default(USER)
+  emailVerified            Boolean         @default(false)
+  verificationToken        String?
   verificationTokenExpires DateTime?
-  organization  Organization?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  deletedAt     DateTime?
+  organization             Organization?
+  refreshTokens            RefreshToken[]
+  passwordResets           PasswordReset[]
+  createdAt                DateTime        @default(now())
+  updatedAt                DateTime        @updatedAt
+  deletedAt                DateTime?
 
   @@index([email])
   @@index([role])
@@ -32,35 +37,41 @@ model User {
 
 // Organization (multi-tenant)
 model Organization {
-  id            String    @id @default(cuid())
-  name          String
-  ownerId       String    @unique
-  owner         User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  bots          Bot[]
-  subscription  Subscription?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  deletedAt     DateTime?
+  id           String        @id @default(cuid())
+  name         String
+  slug         String?       @unique
+  description  String?
+  logoUrl      String?
+  ownerId      String        @unique
+  owner        User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  bots         Bot[]
+  subscription Subscription?
+  teamMembers  TeamMember[]
+  apiKeys      ApiKey[]
+  invoices     Invoice[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  deletedAt    DateTime?
 
   @@index([ownerId])
 }
 
 // Chatbot
 model Bot {
-  id              String    @id @default(cuid())
-  organizationId  String
-  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  name            String
-  description     String?
-  systemPrompt    String    @db.Text
-  model           String    @default("gpt-4-turbo")
-  temperature     Float     @default(0.7)
-  status          BotStatus @default(DRAFT)
-  tone            String?   @default("professional")
-  conversations   Conversation[]
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  deletedAt       DateTime?
+  id             String         @id @default(cuid())
+  organizationId String
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  description    String?
+  systemPrompt   String         @db.Text
+  model          String         @default("gpt-4-turbo")
+  temperature    Float          @default(0.7)
+  status         BotStatus      @default(DRAFT)
+  tone           String?        @default("professional")
+  conversations  Conversation[]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  deletedAt      DateTime?
 
   @@index([organizationId])
   @@index([status])
@@ -69,14 +80,14 @@ model Bot {
 
 // Conversation
 model Conversation {
-  id              String    @id @default(cuid())
-  botId           String
-  bot             Bot       @relation(fields: [botId], references: [id], onDelete: Cascade)
-  userIdentifier  String    // Email or anonymous ID
-  messages        Message[]
-  satisfaction    Int?      // 1-5 rating
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id             String    @id @default(cuid())
+  botId          String
+  bot            Bot       @relation(fields: [botId], references: [id], onDelete: Cascade)
+  userIdentifier String // Email or anonymous ID
+  messages       Message[]
+  satisfaction   Int? // 1-5 rating
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   @@index([botId])
   @@index([userIdentifier])
@@ -85,13 +96,13 @@ model Conversation {
 
 // Message
 model Message {
-  id              String    @id @default(cuid())
-  conversationId  String
-  conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  role            MessageRole
-  content         String    @db.Text
-  tokens          Int?      // Token count for billing
-  timestamp       DateTime  @default(now())
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           MessageRole
+  content        String       @db.Text
+  tokens         Int? // Token count for billing
+  timestamp      DateTime     @default(now())
 
   @@index([conversationId])
   @@index([timestamp])
@@ -99,19 +110,20 @@ model Message {
 
 // Subscription
 model Subscription {
-  id              String    @id @default(cuid())
-  organizationId  String    @unique
-  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  stripeCustomerId String?
+  id                   String             @id @default(cuid())
+  organizationId       String             @unique
+  organization         Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  stripeCustomerId     String?
   stripeSubscriptionId String?
-  plan            SubscriptionPlan @default(FREE)
-  status          SubscriptionStatus @default(ACTIVE)
-  messagesUsed    Int       @default(0)
-  messagesLimit   Int       @default(1000)
-  currentPeriodStart DateTime?
-  currentPeriodEnd DateTime?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  plan                 SubscriptionPlan   @default(FREE)
+  status               SubscriptionStatus @default(ACTIVE)
+  messagesUsed         Int                @default(0)
+  messagesLimit        Int                @default(1000)
+  currentPeriodStart   DateTime?
+  currentPeriodEnd     DateTime?
+  invoices             Invoice[]
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
 
   @@index([organizationId])
   @@index([status])
@@ -119,18 +131,18 @@ model Subscription {
 
 // Analytics (for aggregated metrics)
 model BotAnalytics {
-  id              String    @id @default(cuid())
-  botId           String
-  date            DateTime  @default(now())
-  conversationCount Int     @default(0)
-  messageCount    Int       @default(0)
-  avgSatisfaction Float?
-  uniqueUsers     Int       @default(0)
-  createdAt       DateTime  @default(now())
+  id                String   @id @default(cuid())
+  botId             String
+  date              DateTime @default(now())
+  conversationCount Int      @default(0)
+  messageCount      Int      @default(0)
+  avgSatisfaction   Float?
+  uniqueUsers       Int      @default(0)
+  createdAt         DateTime @default(now())
 
+  @@unique([botId, date])
   @@index([botId])
   @@index([date])
-  @@unique([botId, date])
 }
 
 // Enums
@@ -164,4 +176,96 @@ enum SubscriptionStatus {
   PAUSED
   CANCELLED
   EXPIRED
+}
+
+// Refresh Token model
+model RefreshToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+// Password Reset model
+model PasswordReset {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+// Invoice model
+model Invoice {
+  id              String        @id @default(cuid())
+  subscriptionId  String
+  subscription    Subscription  @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  stripeInvoiceId String?
+  amount          Float
+  currency        String        @default("USD")
+  status          String        @default("DRAFT")
+  paidAt          DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  organization    Organization? @relation(fields: [organizationId], references: [id])
+  organizationId  String?
+
+  @@index([subscriptionId])
+  @@index([stripeInvoiceId])
+}
+
+// Team Member model
+model TeamMember {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  email          String
+  role           String       @default("MEMBER")
+  invitedAt      DateTime     @default(now())
+  acceptedAt     DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([organizationId, email])
+  @@index([organizationId])
+}
+
+// API Key model
+model ApiKey {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  key            String       @unique
+  secret         String
+  lastUsedAt     DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([organizationId])
+}
+
+// Audit Log model
+model AuditLog {
+  id             String   @id @default(cuid())
+  organizationId String
+  userId         String?
+  action         String
+  resource       String
+  resourceId     String?
+  changes        Json?
+  ipAddress      String?
+  userAgent      String?
+  createdAt      DateTime @default(now())
+
+  @@index([organizationId])
+  @@index([userId])
+  @@index([createdAt])
 }
