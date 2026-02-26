@@ -20,40 +20,107 @@ import { JwtAuthGuard } from '../auth/jwt.guard';
 export class BotsController {
   constructor(private botsService: BotsService) {}
 
+  /**
+   * Create a new bot
+   * POST /bots
+   */
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  async createBot(@Request() req, @Body() createBotDto: CreateBotDto): Promise<BotResponseDto> {
-    return this.botsService.createBot(req.user.sub, createBotDto);
+  async createBot(@Request() req: any, @Body() createBotDto: CreateBotDto) {
+    return this.botsService.createBot(req.user.id, createBotDto);
   }
 
+  /**
+   * Get all bots for the user's organization
+   * GET /bots
+   */
   @Get()
-  async getBots(@Request() req): Promise<BotResponseDto[]> {
-    return this.botsService.getBots(req.user.sub);
+  @HttpCode(HttpStatus.OK)
+  async getBots(@Request() req: any) {
+    return this.botsService.getBots(req.user.id);
   }
 
+  /**
+   * Get a specific bot
+   * GET /bots/:id
+   */
   @Get(':id')
-  async getBot(@Request() req, @Param('id') botId: string): Promise<BotResponseDto> {
-    return this.botsService.getBot(req.user.sub, botId);
+  @HttpCode(HttpStatus.OK)
+  async getBot(@Request() req: any, @Param('id') botId: string) {
+    return this.botsService.getBot(req.user.id, botId);
   }
 
+  /**
+   * Update a bot
+   * PATCH /bots/:id
+   */
   @Patch(':id')
+  @HttpCode(HttpStatus.OK)
   async updateBot(
-    @Request() req,
+    @Request() req: any,
     @Param('id') botId: string,
     @Body() updateBotDto: UpdateBotDto,
-  ): Promise<BotResponseDto> {
-    return this.botsService.updateBot(req.user.sub, botId, updateBotDto);
+  ) {
+    return this.botsService.updateBot(req.user.id, botId, updateBotDto);
   }
 
+  /**
+   * Delete a bot
+   * DELETE /bots/:id
+   */
   @Delete(':id')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  async deleteBot(@Request() req, @Param('id') botId: string): Promise<void> {
-    return this.botsService.deleteBot(req.user.sub, botId);
+  @HttpCode(HttpStatus.OK)
+  async deleteBot(@Request() req: any, @Param('id') botId: string) {
+    return this.botsService.deleteBot(req.user.id, botId);
   }
 
+  /**
+   * Publish a bot (make it active)
+   * POST /bots/:id/publish
+   */
+  @Post(':id/publish')
+  @HttpCode(HttpStatus.OK)
+  async publishBot(@Request() req: any, @Param('id') botId: string) {
+    return this.botsService.publishBot(req.user.id, botId);
+  }
+
+  /**
+   * Pause a bot
+   * POST /bots/:id/pause
+   */
+  @Post(':id/pause')
+  @HttpCode(HttpStatus.OK)
+  async pauseBot(@Request() req: any, @Param('id') botId: string) {
+    return this.botsService.pauseBot(req.user.id, botId);
+  }
+
+  /**
+   * Generate embed code for a bot
+   * POST /bots/:id/embed-code
+   */
+  @Post(':id/embed-code')
+  @HttpCode(HttpStatus.OK)
+  async generateEmbedCode(@Request() req: any, @Param('id') botId: string) {
+    return this.botsService.generateEmbedCode(req.user.id, botId);
+  }
+
+  /**
+   * Get embed code for a bot
+   * GET /bots/:id/embed-code
+   */
   @Get(':id/embed-code')
-  async getEmbedCode(@Request() req, @Param('id') botId: string): Promise<{ embedCode: string }> {
-    const embedCode = await this.botsService.getEmbedCode(req.user.sub, botId);
-    return { embedCode };
+  @HttpCode(HttpStatus.OK)
+  async getEmbedCode(@Param('id') botId: string) {
+    return this.botsService.getEmbedCode(botId);
+  }
+
+  /**
+   * Get bot statistics
+   * GET /bots/:id/stats
+   */
+  @Get(':id/stats')
+  @HttpCode(HttpStatus.OK)
+  async getBotStats(@Request() req: any, @Param('id') botId: string) {
+    return this.botsService.getBotStats(req.user.id, botId);
   }
 }
