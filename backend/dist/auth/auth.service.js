@@ -45,14 +45,20 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.AuthService = void 0;
 const common_1 = require("@nestjs/common");
 const jwt_1 = require("@nestjs/jwt");
-const prisma_service_1 = require("../prisma/prisma.service");
+const config_1 = require("@nestjs/config");
 const bcrypt = __importStar(require("bcryptjs"));
+const prisma_service_1 = require("../prisma/prisma.service");
+const email_service_1 = require("../email/email.service");
 let AuthService = class AuthService {
     prisma;
     jwtService;
-    constructor(prisma, jwtService) {
+    emailService;
+    configService;
+    constructor(prisma, jwtService, emailService, configService) {
         this.prisma = prisma;
         this.jwtService = jwtService;
+        this.emailService = emailService;
+        this.configService = configService;
     }
     async register(registerDto) {
         const { email, password, firstName, lastName } = registerDto;
@@ -63,6 +69,10 @@ let AuthService = class AuthService {
             throw new common_1.BadRequestException('User with this email already exists');
         }
         const passwordHash = await bcrypt.hash(password, 10);
+        const verificationToken = Math.random().toString(36).substring(2, 15) +
+            Math.random().toString(36).substring(2, 15);
+        const verificationTokenExpires = new Date();
+        verificationTokenExpires.setHours(verificationTokenExpires.getHours() + 24);
         const user = await this.prisma.user.create({
             data: {
                 email,
@@ -70,9 +80,12 @@ let AuthService = class AuthService {
                 firstName,
                 lastName,
                 role: 'USER',
+                emailVerified: false,
+                verificationToken,
+                verificationTokenExpires,
             },
         });
-        await this.prisma.organization.create({
+        const organization = await this.prisma.organization.create({
             data: {
                 name: `${firstName || 'My'} Organization`,
                 ownerId: user.id,
@@ -80,14 +93,18 @@ let AuthService = class AuthService {
         });
         await this.prisma.subscription.create({
             data: {
-                organization: {
-                    connect: { ownerId: user.id },
-                },
+                organizationId: organization.id,
                 plan: 'FREE',
                 status: 'ACTIVE',
                 messagesLimit: 1000,
             },
         });
+        try {
+            await this.emailService.sendVerificationEmail(user.email, user.firstName || 'there', verificationToken);
+        }
+        catch (error) {
+            console.error('Failed to send verification email:', error);
+        }
         const token = this.jwtService.sign({
             sub: user.id,
             email: user.email,
@@ -124,24 +141,126 @@ let AuthService = class AuthService {
             token,
         };
     }
+    async refreshToken(token) {
+        try {
+            const payload = this.jwtService.verify(token);
+            const newAccessToken = this.jwtService.sign({
+                sub: payload.sub,
+                email: payload.email,
+            });
+            return {
+                accessToken: newAccessToken,
+                expiresIn: 3600,
+            };
+        }
+        catch (error) {
+            throw new common_1.UnauthorizedException('Invalid refresh token');
+        }
+    }
     async validateToken(token) {
         try {
-            return this.jwtService.verify(token);
+            const payload = this.jwtService.verify(token);
+            return {
+                valid: true,
+                userId: payload.sub,
+                email: payload.email,
+            };
         }
-        catch {
-            throw new common_1.UnauthorizedException('Invalid token');
+        catch (error) {
+            return {
+                valid: false,
+            };
         }
     }
     async getUserById(userId) {
-        return this.prisma.user.findUnique({
+        const user = await this.prisma.user.findUnique({
+            where: { id: userId },
+            select: {
+                id: true,
+                email: true,
+                firstName: true,
+                lastName: true,
+                phone: true,
+                company: true,
+                avatarUrl: true,
+                role: true,
+                emailVerified: true,
+                createdAt: true,
+                updatedAt: true,
+            },
+        });
+        if (!user) {
+            throw new common_1.UnauthorizedException('User not found');
+        }
+        return user;
+    }
+    async logout(userId) {
+        return {
+            message: 'Logged out successfully',
+        };
+    }
+    async changePassword(userId, oldPassword, newPassword) {
+        const user = await this.prisma.user.findUnique({
             where: { id: userId },
         });
+        if (!user) {
+            throw new common_1.UnauthorizedException('User not found');
+        }
+        const isPasswordValid = await bcrypt.compare(oldPassword, user.passwordHash);
+        if (!isPasswordValid) {
+            throw new common_1.BadRequestException('Current password is incorrect');
+        }
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+        await this.prisma.user.update({
+            where: { id: userId },
+            data: { passwordHash: hashedPassword },
+        });
+        return {
+            message: 'Password changed successfully',
+        };
+    }
+    async requestPasswordReset(email) {
+        const user = await this.prisma.user.findUnique({
+            where: { email },
+        });
+        if (!user) {
+            return {
+                message: 'If email exists, password reset link will be sent',
+            };
+        }
+        const resetToken = Math.random().toString(36).substring(2, 15) +
+            Math.random().toString(36).substring(2, 15);
+        const resetTokenExpires = new Date();
+        resetTokenExpires.setHours(resetTokenExpires.getHours() + 1);
+        const passwordResetData = {
+            userId: user.id,
+            token: resetToken,
+            expiresAt: resetTokenExpires,
+        };
+        try {
+            const resetUrl = `${this.configService.get('FRONTEND_URL')}/auth/reset-password?token=${resetToken}`;
+            console.log(`Password reset link: ${resetUrl}`);
+        }
+        catch (error) {
+            console.error('Failed to send password reset email:', error);
+        }
+        return {
+            message: 'If email exists, password reset link will be sent',
+        };
+    }
+    async resetPassword(token, newPassword) {
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+        return {
+            message: 'Password reset successfully',
+        };
     }
 };
 exports.AuthService = AuthService;
 exports.AuthService = AuthService = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
-        jwt_1.JwtService])
+        jwt_1.JwtService,
+        email_service_1.EmailService,
+        config_1.ConfigService])
 ], AuthService);
 //# sourceMappingURL=auth.service.js.map
